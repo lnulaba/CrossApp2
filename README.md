@@ -28,7 +28,6 @@
 - `CrossApp.sln` — solution;
 - `src/Cli/Cli.csproj` — консольний .NET-проєкт;
 - `src/Cli/Program.cs` — код програми;
-- `REPORT.md` — звіт до лабораторної роботи.
 
 ## Середовище
 
@@ -55,16 +54,31 @@ dotnet run --project src/Cli/Cli.csproj -- --json
 Програма показує операційну систему, архітектуру процесу, версію .NET,
 runtime, каталоги запуску та предметну область.
 
-## Self-contained публікація
+## Додаткове завдання
+
+### 1. Self-contained публікація
 
 ```bash
 dotnet publish src/Cli -c Release -r osx-arm64 --self-contained true
 dotnet publish src/Cli -c Release -r linux-x64 --self-contained true
 ```
 
-Підготовлено публікацію для macOS ARM64 і Linux x64.
+Підготовлено публікацію для двох RID. Розмір каталогів `publish`:
 
-## Docker
+| RID | Розмір |
+| --- | ---: |
+| `osx-arm64` | 76 MB |
+| `linux-x64` | 71 MB |
+
+### 2. JSON-режим
+
+Прапорець `--json` виводить ту саму інформацію одним JSON-рядком:
+
+```bash
+dotnet run --project src/Cli/Cli.csproj -- --json
+```
+
+### 3. Запуск у Docker
 
 ```bash
 docker run --rm -v ${PWD}:/src -w /src mcr.microsoft.com/dotnet/sdk:8.0 \
@@ -72,4 +86,4 @@ docker run --rm -v ${PWD}:/src -w /src mcr.microsoft.com/dotnet/sdk:8.0 \
 ```
 
 Локально `OSDescription` визначається як `Darwin`, а в Linux-контейнері — як
-`Linux`.
+`Linux`. Для Docker Desktop демон має бути запущений.
