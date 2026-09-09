@@ -1,5 +1,6 @@
-## Ignore build outputs
 bin/
 obj/
+.vscode/
+.DS_Store
 .vscode/
 .DS_Store
