@@ -25,7 +25,7 @@
 
 ## Структура
 
-- `CrossApp.sln` — solution;
+- `CrossApp.slnx` — solution у сучасному XML-форматі;
 - `src/Cli/Cli.csproj` — консольний .NET-проєкт;
 - `src/Cli/Program.cs` — код програми;
 
@@ -41,7 +41,7 @@
 З кореня репозиторію:
 
 ```bash
-dotnet build CrossApp.sln
+dotnet build CrossApp.slnx
 dotnet run --project src/Cli/Cli.csproj
 ```
 
