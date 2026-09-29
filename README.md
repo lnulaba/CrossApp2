@@ -246,13 +246,13 @@ docker run --rm \
 ### 29. Зібрати solution у конфігурації Release
 
 ```bash
-dotnet build CrossApp.slnx -c Release
+dotnet build /Users/marta/Desktop/cross/lab_1/CrossApp.slnx -c Release
 ```
 
 ### 30. Перевірити build note для `net10.0`
 
 ```bash
-dotnet build src/Core/Core.csproj -f net10.0 -c Release
+dotnet build /Users/marta/Desktop/cross/lab_1/src/Core/Core.csproj -f net10.0 -c Release
 ```
 
 ### 31. Опублікувати self-contained застосунок для Linux ARM64 у Docker
@@ -261,9 +261,9 @@ dotnet build src/Core/Core.csproj -f net10.0 -c Release
 входить до публікації; Docker використовується лише для виконання команди.
 
 ```bash
-mkdir -p publish/linux-arm64
+mkdir -p /Users/marta/Desktop/cross/lab_1/publish/linux-arm64
 docker run --rm \
-  -v "${PWD}:/src" \
+  -v "/Users/marta/Desktop/cross/lab_1:/src" \
   -w /src \
   mcr.microsoft.com/dotnet/sdk:8.0 \
   dotnet publish src/Cli/Cli.csproj \
@@ -282,20 +282,20 @@ docker run --rm \
 .NET runtime і складається з файлів застосунку.
 
 ```bash
-mkdir -p publish/win-x64
-dotnet publish src/Cli/Cli.csproj \
+mkdir -p /Users/marta/Desktop/cross/lab_1/publish/win-x64
+dotnet publish /Users/marta/Desktop/cross/lab_1/src/Cli/Cli.csproj \
   -c Release \
   -f net10.0 \
   -r win-x64 \
   --self-contained false \
-  -o publish/win-x64
+  -o /Users/marta/Desktop/cross/lab_1/publish/win-x64
 ```
 
 ### 33. Запустити Linux-публікацію в Docker
 
 ```bash
 docker run --rm \
-  -v "${PWD}/publish/linux-arm64:/app" \
+  -v "/Users/marta/Desktop/cross/lab_1/publish/linux-arm64:/app" \
   mcr.microsoft.com/dotnet/runtime:8.0 \
   /app/Cli --json
 ```
@@ -306,33 +306,33 @@ docker run --rm \
 входить до одного виконуваного файла `Cli`; Docker-контейнер не створюється.
 
 ```bash
-dotnet publish src/Cli -c Release -f net8.0 -r linux-x64 \
+dotnet publish /Users/marta/Desktop/cross/lab_1/src/Cli -c Release -f net8.0 -r linux-x64 \
   --self-contained true \
   -p:PublishSingleFile=true \
   -p:PublishTrimmed=true \
-  -o publish/linux-x64-trimmed
+  -o /Users/marta/Desktop/cross/lab_1/publish/linux-x64-trimmed
 ```
 
 ### 35. Опублікувати self-contained single-file для Linux x64
 
 ```bash
-dotnet publish src/Cli -c Release -f net8.0 -r linux-x64 \
+dotnet publish /Users/marta/Desktop/cross/lab_1/src/Cli -c Release -f net8.0 -r linux-x64 \
   --self-contained true \
   -p:PublishSingleFile=true \
-  -o publish/linux-x64
+  -o /Users/marta/Desktop/cross/lab_1/publish/linux-x64
 ```
 
 ### 36. Перевірити створені publish-каталоги
 
 ```bash
-find publish -maxdepth 2 -type f -perm -111 -print
-du -sh publish/*
+find /Users/marta/Desktop/cross/lab_1/publish -maxdepth 2 -type f -perm -111 -print
+du -sh /Users/marta/Desktop/cross/lab_1/publish/*
 ```
 
 ### 37. Очистити результати додаткових публікацій
 
 ```bash
-rm -rf publish
+rm -rf /Users/marta/Desktop/cross/lab_1/publish
 ```
 
 ## Фінальна перевірка
