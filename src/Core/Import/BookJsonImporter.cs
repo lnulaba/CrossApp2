@@ -10,12 +10,9 @@ public static class BookJsonImporter
         try
         {
             string json = File.ReadAllText(path, System.Text.Encoding.UTF8);
-            JsonSerializerOptions options = new()
-            {
-                PropertyNameCaseInsensitive = true
-            };
-
-            List<BookDto> items = JsonSerializer.Deserialize<List<BookDto>>(json, options) ?? [];
+            List<BookDto> items = JsonSerializer.Deserialize(
+                json,
+                BookJsonContext.Default.ListBookDto) ?? [];
             return new ImportResult<BookDto>(items, []);
         }
         catch (JsonException exception)

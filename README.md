@@ -1,5 +1,16 @@
 # CrossApp
 
+> Увага: git-репозиторій і solution розташовані в каталозі
+> `/Users/marta/Desktop/cross/lab_1`, а не в його батьківському каталозі
+> `/Users/marta/Desktop/cross`. Перед командами нижче один раз виконайте:
+>
+> ```bash
+> cd /Users/marta/Desktop/cross/lab_1
+> ```
+>
+> Якщо prompt уже закінчується на `lab_1 %`, повторно виконувати `cd lab_1`
+> не потрібно.
+
 Лабораторна робота 2: бібліотека `Core`, консольний застосунок `Cli`,
 multi-targeting та публікація.
 
@@ -244,7 +255,10 @@ dotnet build CrossApp.slnx -c Release
 dotnet build src/Core/Core.csproj -f net10.0 -c Release
 ```
 
-### 31. Опублікувати застосунок для Linux ARM64 у Docker
+### 31. Опублікувати self-contained застосунок для Linux ARM64 у Docker
+
+Тип публікації: `linux-arm64`, self-contained, кілька файлів. Runtime .NET
+входить до публікації; Docker використовується лише для виконання команди.
 
 ```bash
 mkdir -p publish/linux-arm64
@@ -259,9 +273,25 @@ docker run --rm \
   --self-contained true \
   -p:TargetFrameworks=net8.0 \
   -o /src/publish/linux-arm64
+
 ```
 
-### 32. Запустити Linux-публікацію в Docker
+### 32. Опублікувати framework-dependent застосунок для Windows x64
+
+Потрібен встановлений .NET 10 runtime на Windows. Публікація не містить
+.NET runtime і складається з файлів застосунку.
+
+```bash
+mkdir -p publish/win-x64
+dotnet publish src/Cli/Cli.csproj \
+  -c Release \
+  -f net10.0 \
+  -r win-x64 \
+  --self-contained false \
+  -o publish/win-x64
+```
+
+### 33. Запустити Linux-публікацію в Docker
 
 ```bash
 docker run --rm \
@@ -270,7 +300,20 @@ docker run --rm \
   /app/Cli --json
 ```
 
-### 33. Опублікувати single-file для Linux x64
+### 34. Опублікувати self-contained single-file trimmed для Linux x64
+
+Тип публікації: `linux-x64`, self-contained, single-file, trimmed. Runtime .NET
+входить до одного виконуваного файла `Cli`; Docker-контейнер не створюється.
+
+```bash
+dotnet publish src/Cli -c Release -f net8.0 -r linux-x64 \
+  --self-contained true \
+  -p:PublishSingleFile=true \
+  -p:PublishTrimmed=true \
+  -o publish/linux-x64-trimmed
+```
+
+### 35. Опублікувати self-contained single-file для Linux x64
 
 ```bash
 dotnet publish src/Cli -c Release -f net8.0 -r linux-x64 \
@@ -279,14 +322,14 @@ dotnet publish src/Cli -c Release -f net8.0 -r linux-x64 \
   -o publish/linux-x64
 ```
 
-### 34. Перевірити створені publish-каталоги
+### 36. Перевірити створені publish-каталоги
 
 ```bash
 find publish -maxdepth 2 -type f -perm -111 -print
 du -sh publish/*
 ```
 
-### 35. Очистити результати додаткових публікацій
+### 37. Очистити результати додаткових публікацій
 
 ```bash
 rm -rf publish
@@ -395,4 +438,170 @@ echo $?
 ```bash
 dotnet sln list CrossApp.slnx
 git status --short
+```
+
+## 4. Лабораторна робота 4
+
+Усі команди цього розділу виконуються з каталогу `/Users/marta/Desktop/cross/lab_1`.
+Якщо термінал відкрито в `/Users/marta/Desktop/cross`, спочатку виконайте
+`cd /Users/marta/Desktop/cross/lab_1`. У системах без `rg` для пошуку нижче
+використовується стандартний `grep`.
+
+Предметна область — бібліотека. Домен містить `BookCopy` (примірник книги),
+`Loan` (видача), `LibraryLendingService` (правило максимум п'ять відкритих
+видач на читача) та `Order` з явними станами `Draft`, `Confirmed`, `Cancelled`.
+DTO тижня 3 не замінюються доменними сутностями.
+
+### 4.1. Інваріанти
+
+- `BookCopy.Id` та `BookCopy.Isbn` не можуть бути порожніми — `ArgumentException`
+  у `BookCopy.Create`.
+- Видати вже виданий примірник або повернути доступний примірник не можна —
+  `InvalidOperationException` у `Issue`/`Return`.
+- `Loan.Id`, `Loan.BookCopyId` та `Loan.ReaderId` обов'язкові — `ArgumentException`
+  у `Loan.Open`.
+- Дата повернення не може бути раніше дати видачі — `ArgumentOutOfRangeException`
+  у `Loan.Close`.
+- Читач не може мати більше п'яти відкритих видач — `InvalidOperationException`
+  у `LibraryLendingService.Issue`.
+- Підтвердити порожнє замовлення не можна; після `Confirmed` рядки не додаються —
+  `InvalidOperationException` у `Order.Confirm`/`Order.AddLine`.
+- Ціна не може бути від'ємною, а кількість у рядку має бути більшою за нуль —
+  `ArgumentOutOfRangeException` у `Order.AddLine`.
+
+### 4.2. Установити початковий стан
+
+```bash
+cd /Users/marta/Desktop/cross/lab_1
+pwd
+dotnet --version
+dotnet --list-sdks
+dotnet restore
+```
+
+### 4.3. Зібрати лабораторну під усі target framework
+
+```bash
+dotnet clean /Users/marta/Desktop/cross/lab_1/CrossApp.slnx
+dotnet build /Users/marta/Desktop/cross/lab_1/CrossApp.slnx
+dotnet build /Users/marta/Desktop/cross/lab_1/src/Core/Core.csproj -f net8.0
+dotnet build /Users/marta/Desktop/cross/lab_1/src/Core/Core.csproj -f net10.0
+dotnet build /Users/marta/Desktop/cross/lab_1/src/Cli/Cli.csproj -f net8.0
+```
+
+### 4.4. Запустити демонстрацію лабораторної
+
+```bash
+dotnet run --project /Users/marta/Desktop/cross/lab_1/src/Cli/Cli.csproj -- --lab4
+```
+
+У демонстрації показано успішну видачу й повернення, `ToDto`/`FromDto`,
+конвертацію `ImportResult<BookDto>` у `ImportResult<BookCopy>`, порожній ISBN,
+повторне повернення, неправильну дату, ліміт п'яти видач і заборону зміни
+підтвердженого замовлення.
+
+### 4.5. Запустити всі наявні CLI-сценарії після лабораторної
+
+Ці команди можна запускати навіть із `/Users/marta/Desktop/cross`:
+
+```bash
+dotnet run --project /Users/marta/Desktop/cross/lab_1/src/Cli/Cli.csproj
+dotnet run --project /Users/marta/Desktop/cross/lab_1/src/Cli/Cli.csproj -- --lab4
+dotnet run --project /Users/marta/Desktop/cross/lab_1/src/Cli/Cli.csproj -- --json
+dotnet run --project /Users/marta/Desktop/cross/lab_1/src/Cli/Cli.csproj -- /Users/marta/Desktop/cross/lab_1/data/sample.csv
+dotnet run --project /Users/marta/Desktop/cross/lab_1/src/Cli/Cli.csproj -- /Users/marta/Desktop/cross/lab_1/data/sample.json
+dotnet run --project /Users/marta/Desktop/cross/lab_1/src/Cli/Cli.csproj -- --mixed /Users/marta/Desktop/cross/lab_1/data/sample-mixed.csv
+```
+
+### 4.6. Запустити зібраний CLI напряму
+
+```bash
+/Users/marta/Desktop/cross/lab_1/src/Cli/bin/Debug/net8.0/Cli --lab4
+/Users/marta/Desktop/cross/lab_1/src/Cli/bin/Debug/net8.0/Cli /Users/marta/Desktop/cross/lab_1/data/sample.csv
+/Users/marta/Desktop/cross/lab_1/src/Cli/bin/Debug/net8.0/Cli /Users/marta/Desktop/cross/lab_1/data/sample.json
+/Users/marta/Desktop/cross/lab_1/src/Cli/bin/Debug/net8.0/Cli --mixed /Users/marta/Desktop/cross/lab_1/data/sample-mixed.csv
+```
+
+### 4.7. Перевірити інкапсуляцію та межі домену
+
+```bash
+grep -REn "public .*\\{ get; set; \\}|public List<|Console\\.|File\\." /Users/marta/Desktop/cross/lab_1/src/Core/Domain || true
+grep -REn "private .*\\(|private .* _|IReadOnlyList|FromDto|ToDto" /Users/marta/Desktop/cross/lab_1/src/Core/Domain /Users/marta/Desktop/cross/lab_1/src/Core/Import
+find /Users/marta/Desktop/cross/lab_1/src/Core/Domain -maxdepth 1 -type f -print | sort
+```
+
+Перший пошук не повинен знайти `Console.`, `File.` або публічні сетери критичного
+стану в `src/Core/Domain`. Другий показує фабрики, мапінг і захищену колекцію.
+
+### 4.8. Перевірити, що CLI повертає успішний код
+
+```bash
+dotnet run --project /Users/marta/Desktop/cross/lab_1/src/Cli/Cli.csproj -- --lab4 >/tmp/lab04-output.txt
+echo $?
+cat /tmp/lab04-output.txt
+grep -En "InvalidOperationException|ArgumentException|ArgumentOutOfRangeException|Фінальний стан" /tmp/lab04-output.txt
+rm -f /tmp/lab04-output.txt
+```
+
+### 4.9. Запустити лабораторну в Docker SDK 8
+
+```bash
+docker run --rm \
+  -v "/Users/marta/Desktop/cross/lab_1:/src" \
+  -w /src \
+  mcr.microsoft.com/dotnet/sdk:8.0 \
+  dotnet run \
+  --project src/Cli/Cli.csproj \
+  -p:TargetFrameworks=net8.0 \
+  -- --lab4
+```
+
+### 4.10. Перевірити Docker-збірку
+
+```bash
+docker run --rm \
+  -v "/Users/marta/Desktop/cross/lab_1:/src" \
+  -w /src \
+  mcr.microsoft.com/dotnet/sdk:8.0 \
+  dotnet build src/Core/Core.csproj \
+  -p:TargetFrameworks=net8.0
+```
+
+### 4.11. Опублікувати CLI для macOS Apple Silicon
+
+```bash
+rm -rf /Users/marta/Desktop/cross/lab_1/publish/lab04-osx-arm64
+dotnet publish /Users/marta/Desktop/cross/lab_1/src/Cli/Cli.csproj \
+  -c Release \
+  -f net8.0 \
+  -r osx-arm64 \
+  --self-contained true \
+  -o /Users/marta/Desktop/cross/lab_1/publish/lab04-osx-arm64
+/Users/marta/Desktop/cross/lab_1/publish/lab04-osx-arm64/Cli --lab4
+du -sh /Users/marta/Desktop/cross/lab_1/publish/lab04-osx-arm64
+```
+
+### 4.12. Перевірити зміни та очистити результати
+
+```bash
+git -C /Users/marta/Desktop/cross/lab_1 diff --check
+git -C /Users/marta/Desktop/cross/lab_1 diff --stat
+git -C /Users/marta/Desktop/cross/lab_1 status --short
+rm -rf /Users/marta/Desktop/cross/lab_1/publish/lab04-osx-arm64
+dotnet clean /Users/marta/Desktop/cross/lab_1/CrossApp.slnx
+```
+
+### 4.13. Підготувати коміт лабораторної
+
+Перевірити staged-файли перед комітом; автоматично додавати сторонні зміни з
+worktree не потрібно.
+
+```bash
+git -C /Users/marta/Desktop/cross/lab_1 status --short
+git -C /Users/marta/Desktop/cross/lab_1 diff -- src/Core/Domain src/Core/Dto/DomainDtos.cs src/Core/Import/DomainImportMapper.cs src/Cli/Program.cs README.md
+git -C /Users/marta/Desktop/cross/lab_1 add README.md src/Core/Domain src/Core/Dto/DomainDtos.cs src/Core/Import/DomainImportMapper.cs src/Cli/Program.cs
+git -C /Users/marta/Desktop/cross/lab_1 diff --cached --check
+git -C /Users/marta/Desktop/cross/lab_1 diff --cached --stat
+git -C /Users/marta/Desktop/cross/lab_1 commit -m "lab04: add domain model invariants"
+git -C /Users/marta/Desktop/cross/lab_1 status --short
 ```
