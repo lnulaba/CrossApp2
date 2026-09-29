@@ -241,7 +241,10 @@ docker run --rm \
   dotnet build CrossApp.slnx
 ```
 
-## Додаткові завдання
+## Додаткові завдання та команди
+
+Команди 29–37 є додатковими командами лабораторної роботи: Release-збірка,
+перевірка `net10.0`, Docker-публікація, різні типи publish і очищення результатів.
 
 ### 29. Зібрати solution у конфігурації Release
 
@@ -502,6 +505,8 @@ dotnet run --project /Users/marta/Desktop/cross/lab_1/src/Cli/Cli.csproj -- --la
 
 ### 4.5. Запустити всі наявні CLI-сценарії після лабораторної
 
+Це додаткові команди для перевірки всіх режимів CLI після виконання лабораторної.
+
 Ці команди можна запускати навіть із `/Users/marta/Desktop/cross`:
 
 ```bash
@@ -524,6 +529,8 @@ dotnet run --project /Users/marta/Desktop/cross/lab_1/src/Cli/Cli.csproj -- --mi
 
 ### 4.7. Перевірити інкапсуляцію та межі домену
 
+Додаткова перевірка структури домену:
+
 ```bash
 grep -REn "public .*\\{ get; set; \\}|public List<|Console\\.|File\\." /Users/marta/Desktop/cross/lab_1/src/Core/Domain || true
 grep -REn "private .*\\(|private .* _|IReadOnlyList|FromDto|ToDto" /Users/marta/Desktop/cross/lab_1/src/Core/Domain /Users/marta/Desktop/cross/lab_1/src/Core/Import
@@ -535,6 +542,8 @@ find /Users/marta/Desktop/cross/lab_1/src/Core/Domain -maxdepth 1 -type f -print
 
 ### 4.8. Перевірити, що CLI повертає успішний код
 
+Додаткова поведінкова перевірка:
+
 ```bash
 dotnet run --project /Users/marta/Desktop/cross/lab_1/src/Cli/Cli.csproj -- --lab4 >/tmp/lab04-output.txt
 echo $?
@@ -544,6 +553,8 @@ rm -f /tmp/lab04-output.txt
 ```
 
 ### 4.9. Запустити лабораторну в Docker SDK 8
+
+Додаткова Docker-перевірка:
 
 ```bash
 docker run --rm \
@@ -558,6 +569,8 @@ docker run --rm \
 
 ### 4.10. Перевірити Docker-збірку
 
+Додаткова Docker-збірка:
+
 ```bash
 docker run --rm \
   -v "/Users/marta/Desktop/cross/lab_1:/src" \
@@ -568,6 +581,8 @@ docker run --rm \
 ```
 
 ### 4.11. Опублікувати CLI для macOS Apple Silicon
+
+Додаткова публікація:
 
 ```bash
 rm -rf /Users/marta/Desktop/cross/lab_1/publish/lab04-osx-arm64
@@ -582,6 +597,8 @@ du -sh /Users/marta/Desktop/cross/lab_1/publish/lab04-osx-arm64
 ```
 
 ### 4.12. Перевірити зміни та очистити результати
+
+Додаткові команди перевірки й очищення:
 
 ```bash
 git -C /Users/marta/Desktop/cross/lab_1 diff --check
