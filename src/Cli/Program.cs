@@ -1,9 +1,12 @@
 using System.Globalization;
 using System.Text.Json;
+using Cli;
 using Core;
+using Core.Abstractions;
 using Core.Domain;
 using Core.Dto;
 using Core.Import;
+using Core.Services;
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 
@@ -18,6 +21,12 @@ if (args.Length == 1 && args[0].Equals("--json", StringComparison.OrdinalIgnoreC
 if (args.Contains("--lab4", StringComparer.OrdinalIgnoreCase))
 {
     RunLab4();
+    return 0;
+}
+
+if (args.Contains("--lab5", StringComparer.OrdinalIgnoreCase))
+{
+    RunLab5(args);
     return 0;
 }
 
@@ -92,7 +101,10 @@ return 0;
 static void RunLab4()
 {
     Console.WriteLine("=== Лабораторна 4: доменна модель ===");
+
+    // BookCopy — доменна сутність
     BookCopy copy = BookCopy.Create("C-001", "978-617-001");
+    //copy.IsIssued = true;
     var lending = new LibraryLendingService();
     Loan loan = lending.Issue(copy, "L-001", "reader-001", new DateTime(2026, 9, 1));
     Console.WriteLine($"Успіх: {copy}; видача {loan.Id} відкрита");
@@ -104,18 +116,26 @@ static void RunLab4()
     BookCopy restoredCopy = BookCopy.FromDto(copyDto);
     Console.WriteLine($"DTO round-trip: {restoredCopy}");
 
+    // Додаткове завдання 1: DTO перетворюються на сутності, помилки зберігаються.
     ImportResult<BookCopy> importedCopies = DomainImportMapper.ToBookCopies(new ImportResult<BookDto>(
         [new BookDto("B-001", "978-617-001", "Кобзар", 1840), new BookDto("B-002", "", "Пошкоджений", 2026)],
         ["рядок 99: демонстраційна помилка"]));
     Console.WriteLine($"Імпорт у домен: прийнято {importedCopies.Items.Count}, помилок {importedCopies.Errors.Count}");
 
     TryDo("порожній ISBN", () => BookCopy.Create("C-002", " "));
-    TryDo("повторне повернення", () => copy.Return());
-    TryDo(
-        "дата раніше видачі",
-        () => Loan.Open(copy, "L-002", "reader-001", new DateTime(2026, 9, 20))
-            .Close(new DateTime(2026, 9, 19)));
+    Console.WriteLine(" стан: об'єкт не створено, існуючі сутності не змінені");
 
+    Console.WriteLine("Інваріант: доступний примірник не можна повернути повторно.");
+    TryDoAndShowUnchanged("повторне повернення", () => copy.ToString(), () => copy.Return());
+
+    // Додаткове завдання 2: сервіс перевіряє правило між BookCopy, Loan і читачем.
+    Loan invalidLoan = Loan.Open(copy, "L-002", "reader-001", new DateTime(2026, 9, 20));
+    TryDoAndShowUnchanged(
+        "дата раніше видачі",
+        () => invalidLoan.IsOpen ? "видача відкрита, ReturnedOn = null" : $"видача закрита, ReturnedOn = {invalidLoan.ReturnedOn}",
+        () => invalidLoan.Close(new DateTime(2026, 9, 19)));
+
+    // Після п'яти відкритих видач шоста операція має бути відхилена.
     var limitedReader = new LibraryLendingService();
     for (int number = 1; number <= 5; number++)
     {
@@ -126,21 +146,54 @@ static void RunLab4()
             new DateTime(2026, 9, 1));
     }
 
-    TryDo(
+    TryDoAndShowUnchanged(
         "шоста відкрита видача читача",
+        () => $"відкритих видач: {limitedReader.Loans.Count}",
         () => limitedReader.Issue(
             BookCopy.Create("C-007", "978-617-001"),
             "L-007",
             "reader-limit",
             new DateTime(2026, 9, 1)));
 
+    // Додаткове завдання 3: OrderStatus захищає допустимі переходи стану.
     Order order = Order.Create("O-001");
     order.AddLine("P-001", "Кобзар", 250, 1);
     order.Confirm();
     Console.WriteLine($"Замовлення: {order.Id}, {order.Status}, сума {order.Total}");
-    TryDo("рядок підтвердженого замовлення", () => order.AddLine("P-002", "Лісова пісня", 200, 1));
+    TryDoAndShowUnchanged(
+        "рядок підтвердженого замовлення",
+        () => $"{order.Status}, рядків: {order.Lines.Count}, сума: {order.Total}",
+        () => order.AddLine("P-002", "Лісова пісня", 200, 1));
 
     Console.WriteLine($"Фінальний стан примірника після відмов: {copy}");
+}
+
+static void RunLab5(string[] args)
+{
+    ILibraryStore store = StoreFactory.Create(args);
+    var service = new LendingService(store);
+    Console.WriteLine("=== Лабораторна 5: сервісний шар і ручний DI ===");
+    Console.WriteLine($"Сховище: {store.GetType().Name}");
+
+    BookCopy copy = service.FindCopy("C-201") ?? service.AddCopy("C-201", "978-617-201");
+    string loanId = $"L-{DateTime.UtcNow:yyyyMMddHHmmssfff}";
+    Loan loan = service.IssueCopy(copy.Id, loanId, "reader-201", DateTime.Today);
+    service.ReturnCopy(loan.Id, DateTime.Today);
+    Console.WriteLine($"Додано і повернуто: {copy.Id}, видача {loan.Id}");
+
+    Console.WriteLine("Список примірників:");
+    foreach (BookCopy item in service.AllCopies())
+    {
+        Console.WriteLine($" {item}");
+    }
+
+    IReadOnlyList<BookCopy> search = service.Search(item => item.Isbn.Contains("201"));
+    Console.WriteLine($"Пошук за ISBN: знайдено {search.Count}");
+
+    TryDo("дубль примірника", () => service.AddCopy(copy.Id, copy.Isbn));
+    TryDo(
+        "видача неіснуючого примірника",
+        () => service.IssueCopy("missing", "L-missing", "reader-201", DateTime.Today));
 }
 
 static void TryDo(string title, Action action)
@@ -155,3 +208,15 @@ static void TryDo(string title, Action action)
         Console.WriteLine($" {title}: {exception.GetType().Name} — {exception.Message}");
     }
 }
+
+static void TryDoAndShowUnchanged(string title, Func<string> readState, Action action)
+{
+    string before = readState();
+    TryDo(title, action);
+    string after = readState();
+
+    Console.WriteLine($" до відмови: {before}");
+    Console.WriteLine($" після відмови: {after}");
+    Console.WriteLine($" стан не змінився: {(before == after ? "так" : "НІ")}");
+}
+
