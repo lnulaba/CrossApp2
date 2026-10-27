@@ -5,12 +5,13 @@ using Core.Dto;
 
 namespace Core.Storage;
 
-public sealed class FileLibraryStore(string path) : ILibraryStore
+public sealed class FileLibraryStore(string path, IEnumerable<BookCopy>? seed = null) : ILibraryStore
 {
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
     private readonly Dictionary<string, BookCopy> _copies = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Loan> _loans = new(StringComparer.OrdinalIgnoreCase);
     private readonly string _path = Path.GetFullPath(path);
+    private readonly IReadOnlyList<BookCopy> _seed = seed?.ToList() ?? [];
     private bool _loaded;
 
     public IReadOnlyList<BookCopy> ListCopies()
@@ -98,6 +99,13 @@ public sealed class FileLibraryStore(string path) : ILibraryStore
             {
                 Loan loan = Loan.FromDto(dto);
                 _loans[loan.Id] = loan;
+            }
+        }
+        if (_copies.Count == 0)
+        {
+            foreach (BookCopy copy in _seed)
+            {
+                _copies[copy.Id] = copy;
             }
         }
 

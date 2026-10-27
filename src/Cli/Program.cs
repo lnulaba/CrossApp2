@@ -5,8 +5,10 @@ using Core;
 using Core.Abstractions;
 using Core.Domain;
 using Core.Dto;
+using Core.Events;
 using Core.Import;
 using Core.Services;
+using Core.Storage;
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 
@@ -27,6 +29,18 @@ if (args.Contains("--lab4", StringComparer.OrdinalIgnoreCase))
 if (args.Contains("--lab5", StringComparer.OrdinalIgnoreCase))
 {
     RunLab5(args);
+    return 0;
+}
+
+if (args.Contains("--lab6", StringComparer.OrdinalIgnoreCase))
+{
+    RunLab6();
+    return 0;
+}
+
+if (args.Contains("--lab6-sinks", StringComparer.OrdinalIgnoreCase))
+{
+    RunLab6Sinks();
     return 0;
 }
 
@@ -170,30 +184,107 @@ static void RunLab4()
 
 static void RunLab5(string[] args)
 {
+    // Composition root передає готове сховище в сервіс через constructor DI.
     ILibraryStore store = StoreFactory.Create(args);
+    // Сервіс отримує залежність через інтерфейс, а не створює сховище сам.
     var service = new LendingService(store);
     Console.WriteLine("=== Лабораторна 5: сервісний шар і ручний DI ===");
     Console.WriteLine($"Сховище: {store.GetType().Name}");
 
-    BookCopy copy = service.FindCopy("C-201") ?? service.AddCopy("C-201", "978-617-201");
+    int copyNumber = 201;
+    while (service.FindCopy($"C-{copyNumber}") is not null)
+    {
+        copyNumber++;
+    }
+
+    string copyId = $"C-{copyNumber}";
+    BookCopy copy = service.AddCopy(copyId, $"978-617-{copyNumber}");
     string loanId = $"L-{DateTime.UtcNow:yyyyMMddHHmmssfff}";
     Loan loan = service.IssueCopy(copy.Id, loanId, "reader-201", DateTime.Today);
     service.ReturnCopy(loan.Id, DateTime.Today);
     Console.WriteLine($"Додано і повернуто: {copy.Id}, видача {loan.Id}");
 
     Console.WriteLine("Список примірників:");
-    foreach (BookCopy item in service.AllCopies())
+    IReadOnlyList<BookCopy> copies = service.AllCopies();
+    foreach (BookCopy item in copies)
     {
         Console.WriteLine($" {item}");
     }
 
-    IReadOnlyList<BookCopy> search = service.Search(item => item.Isbn.Contains("201"));
-    Console.WriteLine($"Пошук за ISBN: знайдено {search.Count}");
+    Console.WriteLine($"Всього примірників: {copies.Count}");
+
+    const string searchText = "201";
+    IReadOnlyList<BookCopy> search = service.Search(item =>
+        item.Isbn.Contains(searchText, StringComparison.OrdinalIgnoreCase));
+    Console.WriteLine($"Пошук: ISBN містить \"{searchText}\"; знайдено {search.Count}");
+    foreach (BookCopy match in search)
+    {
+        Console.WriteLine($" знайдено: {match}");
+    }
 
     TryDo("дубль примірника", () => service.AddCopy(copy.Id, copy.Isbn));
     TryDo(
         "видача неіснуючого примірника",
         () => service.IssueCopy("missing", "L-missing", "reader-201", DateTime.Today));
+}
+
+static void RunLab6()
+{
+    ILibraryStore store = new InMemoryLibraryStore(SampleData.Copies());
+    var service = new LendingService(store);
+    string logPath = Path.Combine(AppContext.BaseDirectory, "logs", "app.log");
+    Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
+    File.WriteAllText(logPath, string.Empty);
+
+    void OnCatalogChanged(object? sender, CatalogChangedEventArgs e)
+    {
+        string line = $"{e.At:HH:mm:ss} {e.Kind,-12} {e.CopyId} {e.ReaderId ?? "-"} " +
+            $"issued={e.IsIssued}";
+        Console.WriteLine(line);
+        File.AppendAllText(logPath, line + Environment.NewLine);
+    }
+
+    int changes = 0;
+    service.Changed += OnCatalogChanged;
+    service.Changed += (_, _) => changes++;
+
+    Console.WriteLine("=== Лабораторна 6: доменні події ===");
+    string copyId = $"L6-{Guid.NewGuid():N}"[..10];
+    BookCopy created = service.AddCopy(copyId, "978-617-006");
+    Loan loan = service.IssueCopy(created.Id, "L6-loan", "reader-006", DateTime.Today);
+    Console.WriteLine($"Подій отримано: {changes}");
+
+    service.Changed -= OnCatalogChanged;
+    service.ReturnCopy(loan.Id, DateTime.Today);
+    Console.WriteLine($"Після -= подій отримано: {changes}");
+
+    TryDo("видача неіснуючого примірника", () =>
+        service.IssueCopy("missing", "L6-missing", "reader-006", DateTime.Today));
+    Console.WriteLine($"Після відмови подій отримано: {changes}");
+
+    IReadOnlyList<BookCopy> available = service.FindAll(copy => !copy.IsIssued);
+    Console.WriteLine($"Func-пошук доступних примірників: {available.Count}");
+    Console.WriteLine($"Лог: {logPath}");
+}
+
+static void RunLab6Sinks()
+{
+    string logPath = Path.Combine(AppContext.BaseDirectory, "logs", "sinks.log");
+    Directory.CreateDirectory(Path.GetDirectoryName(logPath)!);
+    File.WriteAllText(logPath, string.Empty);
+
+    INotificationSink[] sinks = [new ConsoleSink(), new FileSink(logPath)];
+    ILibraryStore store = new InMemoryLibraryStore(SampleData.Copies());
+    var service = new LendingService(store, sinks);
+    BookCopy copy = service.AddCopy("L6-SINK", "978-617-006");
+    service.IssueCopy(copy.Id, "L6-sink-loan", "reader-sink", DateTime.Today);
+
+    Console.WriteLine($"Sink-лог: {logPath}");
+    Console.WriteLine("Звіт імпорту:");
+    ImportResult<BookDto> import = BookCsvImporter.Load(
+        Path.Combine("data", "test_errors.csv"),
+        error => Console.WriteLine($" ! {error}"));
+    Console.WriteLine($"Прийнято: {import.Items.Count}, помилок: {import.Errors.Count}");
 }
 
 static void TryDo(string title, Action action)

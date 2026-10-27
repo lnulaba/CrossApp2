@@ -5,6 +5,7 @@ namespace Core.Storage;
 
 public sealed class CachingLibraryStore(ILibraryStore inner) : ILibraryStore
 {
+    // Декоратор приймає той самий контракт і додає кешування результатів читання.
     private readonly ILibraryStore _inner = inner ?? throw new ArgumentNullException(nameof(inner));
     private IReadOnlyList<BookCopy>? _copies;
     private IReadOnlyList<Loan>? _loans;

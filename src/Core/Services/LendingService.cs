@@ -1,17 +1,43 @@
 using Core.Abstractions;
 using Core.Domain;
+using Core.Events;
 
 namespace Core.Services;
 
-public sealed class LendingService(ILibraryStore store)
+// Сервіс містить бізнес-операції та працює з будь-яким ILibraryStore.
+// Constructor DI: store має тип інтерфейсу, а не конкретного сховища.
+public sealed class LendingService(
+    ILibraryStore store,
+    IEnumerable<INotificationSink>? notificationSinks = null)
 {
     private const int MaxOpenLoansPerReader = 5;
+    // Сервіс отримує абстракцію ззовні, тому не створює конкретне сховище сам.
     private readonly ILibraryStore _store = store ?? throw new ArgumentNullException(nameof(store));
+    private readonly IReadOnlyList<INotificationSink> _notificationSinks =
+        (notificationSinks ?? []).ToList();
+
+    public event EventHandler<CatalogChangedEventArgs>? Changed;
+
+    private void OnChanged(BookCopy copy, CatalogChangeKind kind, Loan? loan = null)
+    {
+        CatalogChangedEventArgs change = new(
+            copy.Id,
+            kind,
+            loan?.Id,
+            loan?.ReaderId,
+            copy.IsIssued);
+        Changed?.Invoke(this, change);
+        foreach (INotificationSink sink in _notificationSinks)
+        {
+            sink.Write(change);
+        }
+    }
 
     public BookCopy AddCopy(string id, string isbn)
     {
         BookCopy copy = BookCopy.Create(id, isbn);
         _store.AddCopy(copy);
+        OnChanged(copy, CatalogChangeKind.BookAdded);
         return copy;
     }
 
@@ -35,6 +61,7 @@ public sealed class LendingService(ILibraryStore store)
         copy.Issue();
         _store.UpdateCopy(copy);
         _store.AddLoan(loan);
+        OnChanged(copy, CatalogChangeKind.CopyIssued, loan);
         return loan;
     }
 
@@ -53,6 +80,7 @@ public sealed class LendingService(ILibraryStore store)
         copy.Return();
         _store.UpdateLoan(loan);
         _store.UpdateCopy(copy);
+        OnChanged(copy, CatalogChangeKind.CopyReturned, loan);
     }
 
     public IReadOnlyList<BookCopy> AllCopies() => _store.ListCopies();
@@ -60,6 +88,9 @@ public sealed class LendingService(ILibraryStore store)
     public BookCopy? FindCopy(string id) => _store.GetCopyById(id);
 
     public IReadOnlyList<BookCopy> Search(Func<BookCopy, bool> predicate)
+        => FindAll(predicate);
+
+    public IReadOnlyList<BookCopy> FindAll(Func<BookCopy, bool> predicate)
     {
         ArgumentNullException.ThrowIfNull(predicate);
         return _store.ListCopies().Where(predicate).ToList();

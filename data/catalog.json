@@ -1,0 +1,133 @@
+{
+  "Copies": [
+    {
+      "Id": "C-101",
+      "Isbn": "978-617-001",
+      "IsIssued": false
+    },
+    {
+      "Id": "C-102",
+      "Isbn": "978-617-002",
+      "IsIssued": false
+    },
+    {
+      "Id": "C-103",
+      "Isbn": "978-617-003",
+      "IsIssued": false
+    },
+    {
+      "Id": "C-201",
+      "Isbn": "978-617-201",
+      "IsIssued": false
+    },
+    {
+      "Id": "C-202",
+      "Isbn": "978-617-202",
+      "IsIssued": false
+    },
+    {
+      "Id": "C-203",
+      "Isbn": "978-617-203",
+      "IsIssued": false
+    },
+    {
+      "Id": "C-204",
+      "Isbn": "978-617-204",
+      "IsIssued": false
+    },
+    {
+      "Id": "C-205",
+      "Isbn": "978-617-205",
+      "IsIssued": false
+    },
+    {
+      "Id": "C-206",
+      "Isbn": "978-617-206",
+      "IsIssued": false
+    },
+    {
+      "Id": "C-207",
+      "Isbn": "978-617-207",
+      "IsIssued": false
+    }
+  ],
+  "Loans": [
+    {
+      "Id": "L-20261021062111393",
+      "BookCopyId": "C-201",
+      "ReaderId": "reader-201",
+      "IssuedOn": "2026-10-21T00:00:00+03:00",
+      "ReturnedOn": "2026-10-21T00:00:00+03:00"
+    },
+    {
+      "Id": "L-20261021062112453",
+      "BookCopyId": "C-201",
+      "ReaderId": "reader-201",
+      "IssuedOn": "2026-10-21T00:00:00+03:00",
+      "ReturnedOn": "2026-10-21T00:00:00+03:00"
+    },
+    {
+      "Id": "L-20261021062126844",
+      "BookCopyId": "C-201",
+      "ReaderId": "reader-201",
+      "IssuedOn": "2026-10-21T00:00:00+03:00",
+      "ReturnedOn": "2026-10-21T00:00:00+03:00"
+    },
+    {
+      "Id": "L-20261021062132919",
+      "BookCopyId": "C-201",
+      "ReaderId": "reader-201",
+      "IssuedOn": "2026-10-21T00:00:00+03:00",
+      "ReturnedOn": "2026-10-21T00:00:00+03:00"
+    },
+    {
+      "Id": "L-20261021062143101",
+      "BookCopyId": "C-201",
+      "ReaderId": "reader-201",
+      "IssuedOn": "2026-10-21T00:00:00+03:00",
+      "ReturnedOn": "2026-10-21T00:00:00+03:00"
+    },
+    {
+      "Id": "L-20261021062222423",
+      "BookCopyId": "C-202",
+      "ReaderId": "reader-201",
+      "IssuedOn": "2026-10-21T00:00:00+03:00",
+      "ReturnedOn": "2026-10-21T00:00:00+03:00"
+    },
+    {
+      "Id": "L-20261021062223393",
+      "BookCopyId": "C-203",
+      "ReaderId": "reader-201",
+      "IssuedOn": "2026-10-21T00:00:00+03:00",
+      "ReturnedOn": "2026-10-21T00:00:00+03:00"
+    },
+    {
+      "Id": "L-20261021062229176",
+      "BookCopyId": "C-204",
+      "ReaderId": "reader-201",
+      "IssuedOn": "2026-10-21T00:00:00+03:00",
+      "ReturnedOn": "2026-10-21T00:00:00+03:00"
+    },
+    {
+      "Id": "L-20261021062231540",
+      "BookCopyId": "C-205",
+      "ReaderId": "reader-201",
+      "IssuedOn": "2026-10-21T00:00:00+03:00",
+      "ReturnedOn": "2026-10-21T00:00:00+03:00"
+    },
+    {
+      "Id": "L-20261021062305956",
+      "BookCopyId": "C-206",
+      "ReaderId": "reader-201",
+      "IssuedOn": "2026-10-21T00:00:00+03:00",
+      "ReturnedOn": "2026-10-21T00:00:00+03:00"
+    },
+    {
+      "Id": "L-20261021062553352",
+      "BookCopyId": "C-207",
+      "ReaderId": "reader-201",
+      "IssuedOn": "2026-10-21T00:00:00+03:00",
+      "ReturnedOn": "2026-10-21T00:00:00+03:00"
+    }
+  ]
+}

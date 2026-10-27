@@ -1,5 +1,6 @@
 namespace Core.Domain;
 
+// Domain Service: координує правила, що стосуються кількох доменних об'єктів.
 public sealed class LibraryLendingService
 {
     private const int MaxOpenLoansPerReader = 5;

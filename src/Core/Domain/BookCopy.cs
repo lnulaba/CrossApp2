@@ -4,17 +4,25 @@ namespace Core.Domain;
 
 public sealed class BookCopy
 {
+    // Приватне поле зберігає стан примірника всередині сутності.
+    private bool _isIssued;
+
+    // Ідентичність можна читати, але змінити її ззовні не можна.
     public string Id { get; }
     public string Isbn { get; }
-    public bool IsIssued { get; private set; }
 
+    // Стан доступний для читання; змінюється лише через Issue() і Return().
+    public bool IsIssued => _isIssued;
+
+    // Приватний конструктор не дозволяє створити примірник в обхід Create().
     private BookCopy(string id, string isbn, bool isIssued)
     {
         Id = id;
         Isbn = isbn;
-        IsIssued = isIssued;
+        _isIssued = isIssued;
     }
 
+    // Factory Method: створює валідний об'єкт і перевіряє його інваріанти.
     public static BookCopy Create(string id, string isbn)
     {
         if (string.IsNullOrWhiteSpace(id))
@@ -38,7 +46,7 @@ public sealed class BookCopy
                 $"Примірник {Id} вже виданий, повторна видача неможлива");
         }
 
-        IsIssued = true;
+        _isIssued = true;
     }
 
     public void Return()
@@ -49,7 +57,7 @@ public sealed class BookCopy
                 $"Примірник {Id} не виданий, повернення неможливе");
         }
 
-        IsIssued = false;
+        _isIssued = false;
     }
 
     public BookCopyDto ToDto() => new(Id, Isbn, IsIssued);
