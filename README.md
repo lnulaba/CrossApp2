@@ -243,14 +243,57 @@ OnChanged(copy, CatalogChangeKind.CopyIssued, loan);
 подальшої відписки:
 
 ```csharp
+void OnCatalogChanged(object? sender, CatalogChangedEventArgs e)
+{
+      string line = $"{e.At:HH:mm:ss} {e.Kind,-12} {e.CopyId} " +
+            $"{e.ReaderId ?? "-"} issued={e.IsIssued}";
+
+      Console.WriteLine(line);
+      File.AppendAllText(logPath, line + Environment.NewLine);
+}
+
+// Перший підписник виводить повідомлення в консоль і записує його у файл.
 service.Changed += OnCatalogChanged;
+
+// Другий підписник-лямбда захоплює changes і рахує всі отримані події.
 service.Changed += (_, _) => changes++;
 ```
 
-`OnCatalogChanged` формує один рядок, друкує його в консоль і додає до файлу.
-Другий підписник є лямбда-виразом. Він захоплює локальну змінну `changes`,
-тобто утворює замикання, і збільшує лічильник при кожній події. Підписники
-викликаються в порядку підписки: спочатку логер, потім лямбда-лічильник.
+`OnCatalogChanged` має стандартну сигнатуру `EventHandler<TEventArgs>`:
+
+- `sender` — об'єкт, який підняв подію, у цьому випадку `LendingService`; у
+   демонстрації він не використовується, тому його можна назвати `_`;
+- `e` — об'єкт `CatalogChangedEventArgs` з даними про зміну: видом операції,
+   ідентифікатором примірника, читачем і поточним станом книги.
+
+Локальний метод формує один текстовий рядок і направляє його одразу у два
+зовнішні канали: `Console.WriteLine` показує подію користувачу, а
+`File.AppendAllText` зберігає її в `app.log`. Сам `Core` цього не робить, тому
+доменний сервіс не залежить від консолі або файлової системи для логування.
+
+Другий підписник є коротким лямбда-виразом:
+
+```csharp
+(_, _) => changes++
+```
+
+Обидва параметри події навмисно ігноруються, бо лічильнику не потрібні деталі
+зміни. Лямбда захоплює локальну змінну `changes`, тобто утворює замикання.
+Завдяки цьому вона може змінювати лічильник при кожному виклику події.
+
+Підписники викликаються синхронно в порядку підписки: спочатку
+`OnCatalogChanged` записує повідомлення, потім лямбда збільшує лічильник.
+Тому після додавання і видачі примірника значення `changes` дорівнює `2`.
+
+Для першого обробника використано іменований локальний метод, а не одноразову
+лямбду, тому його можна згодом видалити:
+
+```csharp
+service.Changed -= OnCatalogChanged;
+```
+
+Нова лямбда з таким самим текстом не була б тим самим делегатом. Щоб відписати
+лямбду, її потрібно було б спочатку зберегти у змінну делегата.
 
 #### 3. Запуск і лог
 
@@ -354,7 +397,7 @@ public IReadOnlyList<BookCopy> FindAll(Func<BookCopy, bool> predicate) =>
 результат повертається через `IReadOnlyList<BookCopy>`. Для повідомлення про
 додану, видану або повернуту книгу використовується `event`, а для отримання
 результату за критерієм — метод із `Func`.
-### Опційні завдання на вищий бал
+
 
 #### `INotificationSink`, `ConsoleSink` і `FileSink`
 
@@ -374,6 +417,64 @@ public LendingService(
 INotificationSink[] sinks = [new ConsoleSink(), new FileSink(logPath)];
 var service = new LendingService(store, sinks);
 ```
+
+## Лабораторна 7: LINQ-звіти
+
+Звіти розміщені в `src/Core/Reports/ReportService.cs` і приймають
+`IEnumerable<BookCopy>`. Для цієї бібліотечної моделі залишок книги — це
+кількість її доступних примірників, згрупованих за ISBN.
+
+| Метод | Питання | LINQ-оператори |
+|---|---|---|
+| `LowStock` | Які книги мають залишок менше порога? | `GroupBy`, `Select`, `Where`, `OrderBy`, `ThenBy` |
+| `TopByQuantity` | Які книги мають найбільше примірників? | `GroupBy`, `Select`, `OrderByDescending`, `ThenBy`, `Take` |
+| `ByGenre` | Як розподілені примірники за жанрами? | `GroupBy`, `Count`, `Select`, `OrderByDescending` |
+| `Totals` | Які підсумкові значення залишку? | `GroupBy`, `Sum`, `Average`, `Max` |
+| `LoansByBook` | Які книги пов'язані з видачами? | `GroupJoin`, `Count`, `Select` |
+
+Приклад групування з проєкцією в DTO:
+
+```csharp
+source
+   .GroupBy(copy => copy.Genre, StringComparer.OrdinalIgnoreCase)
+   .Select(group => new GroupSummary(
+      group.Key,
+      group.Count(),
+      group.Count(copy => !copy.IsIssued)))
+   .OrderByDescending(summary => summary.TotalQuantity)
+   .ToList();
+```
+
+`group.Key` — значення, за яким утворено групу, а `group.Count()` — кількість
+елементів у цій групі. Звіти повертають `StockLine`, `GroupSummary` і
+`LoanSummary`, а не доменні сутності, тому формат відповіді не залежить від
+внутрішньої моделі `BookCopy`.
+
+Підкоманди CLI:
+
+```bash
+dotnet run --project src/Cli/Cli.csproj -- report-top
+dotnet run --project src/Cli/Cli.csproj -- report-low
+dotnet run --project src/Cli/Cli.csproj -- report-groups
+dotnet run --project src/Cli/Cli.csproj -- report-sum
+dotnet run --project src/Cli/Cli.csproj -- report-loans
+dotnet run --project src/Cli/Cli.csproj -- report-deferred
+dotnet run --project src/Cli/Cli.csproj -- report-benchmark
+```
+
+`Where`, `Select`, `OrderBy` і `GroupBy` формують відкладений запит, а
+`Count()`, `ToList()` та інші завершальні оператори запускають його перебір.
+У `report-deferred` локальний список спочатку має 17 доступних примірників;
+після побудови запиту до нього додається ще один, тому два виклики `Count()`
+дають `17` і `18`. Після `ToList()` створюється знімок, очищення джерела вже
+не змінює його, і вивід залишається `18`.
+
+Додаткове завдання реалізовано в трьох формах. `LoansByBook` використовує
+`GroupJoin` для поєднання примірників із видачами, `TopBy` є власним методом-
+розширенням із другим ключем сортування і використовується в `TopByQuantity`
+та `TopGenres`, а `ByGenreQuerySyntax` показує той самий GroupBy у query
+syntax. `report-benchmark` генерує 100 000 примірників і вимірює час одного
+виклику топ-звіту через `Stopwatch`.
 
 `ConsoleSink` пише повідомлення в консоль, а `FileSink` — у файл. `Core`
 залежить лише від маленького інтерфейсу, але не залежить від `System.Console`

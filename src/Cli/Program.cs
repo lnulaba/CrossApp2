@@ -7,6 +7,7 @@ using Core.Domain;
 using Core.Dto;
 using Core.Events;
 using Core.Import;
+using Core.Reports;
 using Core.Services;
 using Core.Storage;
 
@@ -41,6 +42,12 @@ if (args.Contains("--lab6", StringComparer.OrdinalIgnoreCase))
 if (args.Contains("--lab6-sinks", StringComparer.OrdinalIgnoreCase))
 {
     RunLab6Sinks();
+    return 0;
+}
+
+if (args.Any(argument => argument.StartsWith("report-", StringComparison.OrdinalIgnoreCase)))
+{
+    RunReport(args);
     return 0;
 }
 
@@ -245,7 +252,9 @@ static void RunLab6()
     }
 
     int changes = 0;
+    // Перший підписник виводить повідомлення в консоль і записує його у файл.
     service.Changed += OnCatalogChanged;
+    // Другий підписник-лямбда захоплює changes і рахує всі отримані події.
     service.Changed += (_, _) => changes++;
 
     Console.WriteLine("=== Лабораторна 6: доменні події ===");
@@ -254,14 +263,17 @@ static void RunLab6()
     Loan loan = service.IssueCopy(created.Id, "L6-loan", "reader-006", DateTime.Today);
     Console.WriteLine($"Подій отримано: {changes}");
 
+    // Відписуємо логер: наступна зміна виконується, але не потрапляє в консоль і файл.
     service.Changed -= OnCatalogChanged;
     service.ReturnCopy(loan.Id, DateTime.Today);
     Console.WriteLine($"Після -= подій отримано: {changes}");
 
+    // Помилка виникає до OnChanged, тому операція не створює подію.
     TryDo("видача неіснуючого примірника", () =>
         service.IssueCopy("missing", "L6-missing", "reader-006", DateTime.Today));
     Console.WriteLine($"Після відмови подій отримано: {changes}");
 
+    // Func задає критерій і повертає результат пошуку; подія лише повідомляє про зміну.
     IReadOnlyList<BookCopy> available = service.FindAll(copy => !copy.IsIssued);
     Console.WriteLine($"Func-пошук доступних примірників: {available.Count}");
     Console.WriteLine($"Лог: {logPath}");
@@ -285,6 +297,62 @@ static void RunLab6Sinks()
         Path.Combine("data", "test_errors.csv"),
         error => Console.WriteLine($" ! {error}"));
     Console.WriteLine($"Прийнято: {import.Items.Count}, помилок: {import.Errors.Count}");
+}
+
+static void RunReport(string[] args)
+{
+    ILibraryStore store = StoreFactory.Create(args);
+    var service = new LendingService(store);
+    IReadOnlyList<BookCopy> copies = service.AllCopies();
+    string command = args.FirstOrDefault(argument =>
+        argument.StartsWith("report-", StringComparison.OrdinalIgnoreCase)) ?? "report-top";
+
+    switch (command.ToLowerInvariant())
+    {
+        case "report-top":
+            PrintStock(ReportService.TopByQuantity(copies, 5));
+            break;
+        case "report-low":
+            PrintStock(ReportService.LowStock(copies, 2));
+            break;
+        case "report-groups":
+            foreach (GroupSummary group in ReportService.ByGenre(copies))
+            {
+                Console.WriteLine($" {group.Key,-10} позицій: {group.Count,3} доступно: {group.TotalQuantity,3}");
+            }
+            break;
+        case "report-sum":
+            (int items, int total, double average, int max) = ReportService.Totals(copies);
+            Console.WriteLine($" книг {items}, доступних примірників {total}, середнє {average:F2}, макс {max}");
+            break;
+        case "report-loans":
+            foreach (LoanSummary loan in ReportService.LoansByBook(copies, store.ListLoans()).Take(5))
+            {
+                Console.WriteLine($" {loan.Sku,-10} {loan.Name,-20} видач: {loan.LoanCount,3} відкритих: {loan.OpenLoanCount,3}");
+            }
+            break;
+        case "report-deferred":
+            (int before, int after, int snapshot) = ReportService.DeferredExecutionDemo(copies);
+            Console.WriteLine($"Доступних до змін: {before}");
+            Console.WriteLine($"Доступних після змін: {after}");
+            Console.WriteLine($"У знімку лишилось: {snapshot}");
+            break;
+        case "report-benchmark":
+            (int benchmarkItems, long elapsedMilliseconds) = ReportService.Benchmark(100_000);
+            Console.WriteLine($"Оброблено {benchmarkItems} записів за {elapsedMilliseconds} мс");
+            break;
+        default:
+            Console.WriteLine("report-top | report-low | report-groups | report-sum | report-loans | report-deferred | report-benchmark");
+            break;
+    }
+}
+
+static void PrintStock(IReadOnlyList<StockLine> lines)
+{
+    foreach (StockLine line in lines)
+    {
+        Console.WriteLine($" {line.Sku,-15} {line.Name,-22} {line.Quantity,6} {line.Unit}");
+    }
 }
 
 static void TryDo(string title, Action action)
