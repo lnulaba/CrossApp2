@@ -16,6 +16,7 @@ public sealed class LendingService(
     private readonly IReadOnlyList<INotificationSink> _notificationSinks =
         (notificationSinks ?? []).ToList();
 
+        // Core повідомляє про зміну, а зовнішній код сам визначає спосіб обробки.
     public event EventHandler<CatalogChangedEventArgs>? Changed;
 
     private void OnChanged(BookCopy copy, CatalogChangeKind kind, Loan? loan = null)

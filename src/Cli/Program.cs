@@ -45,6 +45,12 @@ if (args.Contains("--lab6-sinks", StringComparer.OrdinalIgnoreCase))
     return 0;
 }
 
+if (args.Contains("--lab6-findall", StringComparer.OrdinalIgnoreCase))
+{
+    RunLab6FindAll();
+    return 0;
+}
+
 if (args.Any(argument => argument.StartsWith("report-", StringComparison.OrdinalIgnoreCase)))
 {
     RunReport(args);
@@ -294,9 +300,43 @@ static void RunLab6Sinks()
     Console.WriteLine($"Sink-лог: {logPath}");
     Console.WriteLine("Звіт імпорту:");
     ImportResult<BookDto> import = BookCsvImporter.Load(
-        Path.Combine("data", "test_errors.csv"),
+        ResolveDataPath("test_errors.csv"),
         error => Console.WriteLine($" ! {error}"));
     Console.WriteLine($"Прийнято: {import.Items.Count}, помилок: {import.Errors.Count}");
+
+    const string searchText = "006";
+    IReadOnlyList<BookCopy> found = service.FindAll(copy =>
+        copy.Isbn.Contains(searchText, StringComparison.OrdinalIgnoreCase));
+    Console.WriteLine($"FindAll: ISBN містить \"{searchText}\"; знайдено {found.Count}");
+    foreach (BookCopy match in found)
+    {
+        Console.WriteLine($" знайдено: {match.Id} [{match.Isbn}]");
+    }
+}
+
+static void RunLab6FindAll()
+{
+    ILibraryStore store = new InMemoryLibraryStore(SampleData.Copies());
+    var service = new LendingService(store);
+    const string searchText = "006";
+
+    IReadOnlyList<BookCopy> found = service.FindAll(copy =>
+        copy.Isbn.Contains(searchText, StringComparison.OrdinalIgnoreCase));
+
+    Console.WriteLine("=== Лабораторна 6: FindAll і Func ===");
+    Console.WriteLine($"ISBN містить \"{searchText}\"; знайдено {found.Count}");
+    foreach (BookCopy copy in found)
+    {
+        Console.WriteLine($" {copy.Id,-8} {copy.Isbn}");
+    }
+}
+
+static string ResolveDataPath(string fileName)
+{
+    string localPath = Path.Combine("data", fileName);
+    return File.Exists(localPath)
+        ? localPath
+        : Path.Combine("lab_1", localPath);
 }
 
 static void RunReport(string[] args)
@@ -313,7 +353,7 @@ static void RunReport(string[] args)
             PrintStock(ReportService.TopByQuantity(copies, 5));
             break;
         case "report-low":
-            PrintStock(ReportService.LowStock(copies, 2));
+            PrintStock(ReportService.LowStock(copies, 10));
             break;
         case "report-groups":
             foreach (GroupSummary group in ReportService.ByGenre(copies))
@@ -338,8 +378,11 @@ static void RunReport(string[] args)
             Console.WriteLine($"У знімку лишилось: {snapshot}");
             break;
         case "report-benchmark":
-            (int benchmarkItems, long elapsedMilliseconds) = ReportService.Benchmark(100_000);
-            Console.WriteLine($"Оброблено {benchmarkItems} записів за {elapsedMilliseconds} мс");
+            (int benchmarkItems, long withoutMaterialization, long withMaterialization) =
+                ReportService.Benchmark(100_000);
+            Console.WriteLine($"Оброблено {benchmarkItems} записів");
+            Console.WriteLine($"Без проміжного ToList: {withoutMaterialization} мс");
+            Console.WriteLine($"З проміжним ToList: {withMaterialization} мс");
             break;
         default:
             Console.WriteLine("report-top | report-low | report-groups | report-sum | report-loans | report-deferred | report-benchmark");

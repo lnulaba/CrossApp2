@@ -121,7 +121,7 @@ public static class ReportService
         return (before, after, snapshot.Count);
     }
 
-    public static (int Items, long ElapsedMilliseconds) Benchmark(int count)
+    public static (int Items, long WithoutMaterializationMilliseconds, long WithMaterializationMilliseconds) Benchmark(int count)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(count);
         List<BookCopy> source = Enumerable.Range(0, count)
@@ -133,9 +133,35 @@ public static class ReportService
                 $"жанр-{number % 5}"))
             .ToList();
 
-        Stopwatch timer = Stopwatch.StartNew();
-        _ = TopByQuantity(source, 5);
-        timer.Stop();
-        return (source.Count, timer.ElapsedMilliseconds);
+        Stopwatch withoutMaterializationTimer = Stopwatch.StartNew();
+        _ = source
+            .GroupBy(copy => copy.Isbn, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new StockLine(
+                group.Key,
+                group.First().Title,
+                group.Count(),
+                "прим."))
+            .OrderByDescending(line => line.Quantity)
+            .ThenBy(line => line.Sku, StringComparer.Ordinal)
+            .Take(5)
+            .ToList();
+        withoutMaterializationTimer.Stop();
+
+        Stopwatch withMaterializationTimer = Stopwatch.StartNew();
+        _ = source
+            .GroupBy(copy => copy.Isbn, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new StockLine(
+                group.Key,
+                group.First().Title,
+                group.Count(),
+                "прим."))
+            .ToList()
+            .OrderByDescending(line => line.Quantity)
+            .ThenBy(line => line.Sku, StringComparer.Ordinal)
+            .Take(5)
+            .ToList();
+        withMaterializationTimer.Stop();
+
+        return (source.Count, withoutMaterializationTimer.ElapsedMilliseconds, withMaterializationTimer.ElapsedMilliseconds);
     }
 }
